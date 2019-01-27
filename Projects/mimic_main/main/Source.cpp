@@ -62,10 +62,7 @@ void readESP32(AsyncWebServer* server, ParamsStruct* params) {
         Note: for ANY parameters you want to use, you must add them to
         the paramsStruct struct located in Source.h first. 
     */
-    server->on("/update_name", HTTP_POST, [=](AsyncWebServerRequest *request){
-        strcpy(params->name, request->arg("name").c_str());
-        request->send(200, "text/plain", "Success");
-    });
+
     
     /* SSE Example.
         - SSEs will be used to continuously send data that was
@@ -161,7 +158,22 @@ void readESP32(AsyncWebServer* server, ParamsStruct* params) {
         strs << angle_wrist;
         str_angle_wrist += strs.str();
 
-        events.onConnect([str_angle_rotunda, str_angle_shoulder, str_angle_elbow, str_angle_wrist](AsyncEventSourceClient *client) 
+        // the idea for this is taken from Nelson Wong's implementation of XHR for his ROSify project.
+        // The server should send a request to the ESP32, which replies with data
+        printf("%s: %i \n", "Rotunda: ", pot_voltage_rotunda);
+        delay(1000);
+        server->on("/update_name", HTTP_POST, [angle_rotunda, angle_shoulder, angle_elbow, angle_wrist](AsyncWebServerRequest *request){
+            int bytes_to_write = 1000;
+            char joint_buffer[bytes_to_write];
+            snprintf(joint_buffer, bytes_to_write, 
+            "rotunda: %f, shoulder: %f, elbow: %f, wrist pitch: %f, wrist roll: %f",
+            angle_rotunda, angle_shoulder, angle_elbow, angle_wrist, 0.0);
+
+            //strcpy(params->name, request->arg("name").c_str());
+            request->send(200, "text/plain", joint_buffer);
+        });
+
+        /*events.onConnect([str_angle_rotunda, str_angle_shoulder, str_angle_elbow, str_angle_wrist](AsyncEventSourceClient *client) 
         {
             if(client->lastId())
             {
@@ -172,6 +184,7 @@ void readESP32(AsyncWebServer* server, ParamsStruct* params) {
             client->send(str_angle_elbow.c_str(), NULL, millis(), 1000);
             client->send(str_angle_wrist.c_str(), NULL, millis(), 1000);
         });
+        */
         // write the value of the potentiometer
         //printf("%s: %i \n", "Rotunda: ", pot_voltage_rotunda);
         //printf("%s: %i \n", "Shoulder:    ", pot_voltage_shoulder);
