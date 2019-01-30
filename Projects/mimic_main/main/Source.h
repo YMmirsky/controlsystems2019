@@ -17,11 +17,11 @@ struct ParamsStruct {
 // this is the data struct that will be sent via. XHR to Mission Control
 // Each value inside this is an angle. We will convert potentiometer values to angles.
 struct ArmJointStruct {
-	String rotunda;
-	String shoulder;
-	String elbow;
-	String wrist_roll;
-	String wrist_pitch;
+	string rotunda;
+	string shoulder;
+	string elbow;
+	string wrist_pitch;
+	string wrist_roll;
 };
 
 void readESP32(AsyncWebServer* server, ParamsStruct* params);
