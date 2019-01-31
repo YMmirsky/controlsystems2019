@@ -19,10 +19,6 @@
 #include "Source.h"
 #include "constants.h"
 
-
-
-// a lot of this code was inspired by https://github.com/espressif/esp-idf/blob/master/examples/peripherals/adc/main/adc1_example_main.c#L75
-
 ParamsStruct params;
 //Server used to listen for XHRs, and send SSEs.
 AsyncWebServer server(80);
@@ -43,7 +39,7 @@ extern "C" void app_main() {
         fflush(stdout);
         esp_restart();
     }
-        vTaskDelay(10);    
+    vTaskDelay(10);    
 }
 
 

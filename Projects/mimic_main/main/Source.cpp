@@ -16,6 +16,11 @@
 #include "esp_spi_flash.h"
 #include "Source.h"
 
+// TEST HEADERS: Taken from:
+//  https://github.com/espressif/esp-idf/issues/1646
+#include "soc/timer_group_struct.h"
+#include "soc/timer_group_reg.h"
+
 // a lot of this code was inspired by 
 //  https://github.com/espressif/esp-idf/blob/master/examples/peripherals/adc/main/adc1_example_main.c#L75
 #define DEFAULT_VREF 1100 // Use adc2_vref_to_gpio() to obtain a better estimate
@@ -80,8 +85,8 @@ void readESP32(AsyncWebServer* server, ParamsStruct* params) {
     std::string str_angle_rotunda = "rotunda: ",
             str_angle_shoulder = "shoulder: ",
             str_angle_elbow = "elbow: ",
-            str_angle_wrist = "wrist: ";
-            str_angle_wrist_roll = "wrist_roll: "
+            str_angle_wrist = "wrist: ",
+            str_angle_wrist_roll = "wrist_roll: ";
     //Characterize ADC
     //adc_chars = calloc(1, sizeof(esp_adc_cal_characteristics_t));
     adc1_config_width(ADC_WIDTH_BIT_12); // ADC capture width is 9 bit
@@ -92,6 +97,11 @@ void readESP32(AsyncWebServer* server, ParamsStruct* params) {
     //adc1_config_channel_atten(gpio_pin_wrist_roll, atten);
     calloc(1, sizeof(esp_adc_cal_characteristics_t));
     esp_adc_cal_characterize(unit, atten, ADC_WIDTH_BIT_12, DEFAULT_VREF, &adc_chars);
+
+    // Attach event source to the server.
+    server->addHandler(&events);
+    // Start server.
+    server->begin();
 
     while (1)
     {
@@ -129,6 +139,12 @@ void readESP32(AsyncWebServer* server, ParamsStruct* params) {
         pot_voltage_wrist = esp_adc_cal_raw_to_voltage(raw_pin_val_wrist, &adc_chars);
         //pot_voltage_wrist_roll = esp_adc_cal_raw_to_voltage(raw_pin_val_wrist_roll, &adc_chars);
 
+        // do a thing here that converts the pot values to angles
+        angle_rotunda = pot_voltage_rotunda;
+        angle_shoulder = pot_voltage_shoulder;
+        angle_elbow = pot_voltage_elbow;
+        angle_wrist = pot_voltage_wrist;
+        angle_wrist_roll = pot_voltage_wrist_roll;
         // convert all double values to raw strings in order to send via. 
         std::ostringstream strs;
         strs << angle_rotunda;
@@ -153,16 +169,21 @@ void readESP32(AsyncWebServer* server, ParamsStruct* params) {
         // The server should send a request to the ESP32, which replies with data
         server->on("/update_name", HTTP_POST, [angle_rotunda, angle_shoulder, angle_elbow, angle_wrist](AsyncWebServerRequest *request){
             // b_t_r corresponds to the size of the package that will be sent via. XHR. 
-            //  according to Nelson W., will need to adjust this precisely for the number of chars that will be sent
+            //  according to Nelson W., will need to adjust this precisely for the number 
+            //  of chars that will be sent
             int bytes_to_write = 1000;
             char joint_buffer[bytes_to_write];
             snprintf(joint_buffer, bytes_to_write, 
             "rotunda: %f, shoulder: %f, elbow: %f, wrist pitch: %f, wrist roll: %f",
-            angle_rotunda, angle_shoulder, angle_elbow, angle_wrist, 0.0);
-
-            //strcpy(params->name, request->arg("name").c_str());
+            angle_rotunda, angle_shoulder, angle_elbow, angle_wrist, angle_wrist_roll);
             request->send(200, "text/plain", joint_buffer);
         });
+        delay(10);
+        // TEST CODE, taken from:
+        //  https://github.com/espressif/esp-idf/issues/1646
+        TIMERG0.wdt_wprotect=TIMG_WDT_WKEY_VALUE;
+        TIMERG0.wdt_feed=1;
+        TIMERG0.wdt_wprotect=0;
 
         /* SSE Example.
             - SSEs will be used to continuously send data that was
@@ -203,10 +224,7 @@ void readESP32(AsyncWebServer* server, ParamsStruct* params) {
         //delay(1000)
         //printf("\n"); // print new line
     }
-    // Attach event source to the server.
-    server->addHandler(&events);
-    // Start server.
-    server->begin();
+    
 }
 
 bool initEEPROM() 
