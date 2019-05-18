@@ -9,6 +9,7 @@
 #include "constants.h"
 #include "driver/adc.h"
 #include "driver/gpio.h"
+#include "driver/uart.h"
 #include "EEPROM.h"
 #include "esp_adc_cal.h"
 #include "esp_log.h"
@@ -29,18 +30,23 @@
 constexpr uint32_t PWM_MIN_PERCENTAGE = 5;
 constexpr uint32_t PWM_MAX_PERCENTAGE = 10;
 
+// these vals are for UART
+#define ECHO_TEST_TXD  (GPIO_NUM_4)
+#define ECHO_TEST_RXD  (GPIO_NUM_5)
+#define ECHO_TEST_RTS  (UART_PIN_NO_CHANGE)
+#define ECHO_TEST_CTS (UART_PIN_NO_CHANGE)
+#define BUF_SIZE (1024)
+
 /* used to calculate ADC characteristics such as gain and offset factors
     The ADC Characteristics structure stores the gain and offset factors of an ESP32 module's ADC. 
     These factors are calculated using the reference voltage, 
-    and the Gain and Offset curves provided in the lookup tables.
-*/
+    and the Gain and Offset curves provided in the lookup tables. */
 static esp_adc_cal_characteristics_t adc_chars; // not entirely sure about what this does
 //static const adc1_channel_t channel = ADC1_CHANNEL_0; // Corresponds to GPIO36
 /*  attenuaton (ADC_ATTEN_DB_0) between 100 and 950mV        The input voltage of ADC will be reduced to about 1/1 
     attenuation (ADC_ATTEN_DB_2_5) between 100 and 1250mV    The input voltage of ADC will be reduced to about 1/1.34 
     attenuation (ADC_ATTEN_DB_6) between 150 to 1750mV       The input voltage of ADC will be reduced to about 1/2 
-    attenuation (ADC_ATTEN_DB_11) between 150 to 2450mV      The input voltage of ADC will be reduced to about 1/3.6 
-*/
+    attenuation (ADC_ATTEN_DB_11) between 150 to 2450mV      The input voltage of ADC will be reduced to about 1/3.6 */
 static const adc_atten_t atten = ADC_ATTEN_DB_11;  
 static const adc_unit_t unit = ADC_UNIT_1; 
 // width corresponds to capture width. Available bit widths are 9, 10, 11 and 12. 
@@ -55,11 +61,12 @@ static const adc1_channel_t gpio_pin_wrist =    ADC1_CHANNEL_4;    // GPIO39
 
 void readESP32(AsyncWebServer* server, ParamsStruct* params) {
     //Create Access Point
-    WiFi.softAP("MyESP32AP", "testpassword");
+    /*WiFi.softAP("MyESP32AP", "testpassword");
     Serial.println();
     Serial.print("IP address: ");
     Serial.println(WiFi.softAPIP());
-    
+    */
+
     AsyncEventSource events("/events");
     DefaultHeaders::Instance().addHeader("Access-Control-Allow-Origin", "*");
  
@@ -99,9 +106,21 @@ void readESP32(AsyncWebServer* server, ParamsStruct* params) {
     esp_adc_cal_characterize(unit, atten, ADC_WIDTH_BIT_12, DEFAULT_VREF, &adc_chars);
 
     // Attach event source to the server.
-    server->addHandler(&events);
+    //server->addHandler(&events);
     // Start server.
-    server->begin();
+    //server->begin();
+
+    // code taken from: https://github.com/espressif/esp-idf/blob/abea9e4c02bb17e86298aec4e299780399e4789f/examples/peripherals/uart/uart_echo/main/uart_echo_example_main.c
+    /* Configure parameters of an UART driver,
+     * communication pins and install the driver */
+    // getting warnings that I'm missing an initializer for rx_flow_ctrl_thresh and use_ref_tick
+    /*uart_config_t uart_config = {
+        .baud_rate = 115200,
+        .data_bits = UART_DATA_8_BITS,
+        .parity    = UART_PARITY_DISABLE,
+        .stop_bits = UART_STOP_BITS_1,
+        .flow_ctrl = UART_HW_FLOWCTRL_DISABLE
+    };*/
 
     while (1)
     {
@@ -167,7 +186,7 @@ void readESP32(AsyncWebServer* server, ParamsStruct* params) {
         */
         // the idea for this is taken from Nelson Wong's implementation of XHR for his ROSify project.
         // The server should send a request to the ESP32, which replies with data
-        server->on("/update_name", HTTP_POST, [angle_rotunda, angle_shoulder, angle_elbow, angle_wrist](AsyncWebServerRequest *request){
+        /*server->on("/update_name", HTTP_POST, [angle_rotunda, angle_shoulder, angle_elbow, angle_wrist](AsyncWebServerRequest *request){
             // b_t_r corresponds to the size of the package that will be sent via. XHR. 
             //  according to Nelson W., will need to adjust this precisely for the number 
             //  of chars that will be sent
@@ -178,12 +197,13 @@ void readESP32(AsyncWebServer* server, ParamsStruct* params) {
             angle_rotunda, angle_shoulder, angle_elbow, angle_wrist, angle_wrist_roll);
             request->send(200, "text/plain", joint_buffer);
         });
+        */
         delay(10);
         // TEST CODE, taken from:
         //  https://github.com/espressif/esp-idf/issues/1646
-        TIMERG0.wdt_wprotect=TIMG_WDT_WKEY_VALUE;
+        /*TIMERG0.wdt_wprotect=TIMG_WDT_WKEY_VALUE;
         TIMERG0.wdt_feed=1;
-        TIMERG0.wdt_wprotect=0;
+        TIMERG0.wdt_wprotect=0;*/
 
         /* SSE Example.
             - SSEs will be used to continuously send data that was
@@ -217,12 +237,12 @@ void readESP32(AsyncWebServer* server, ParamsStruct* params) {
         });
         */
         // write the value of the potentiometer
-        //printf("%s: %i \n", "Rotunda: ", pot_voltage_rotunda);
-        //printf("%s: %i \n", "Shoulder:    ", pot_voltage_shoulder);
-        //printf("%s: %i \n", "Elbow:       ", pot_voltage_elbow);
-        //printf("%s: %i \n", "Wrist:       ", pot_voltage_wrist);
-        //delay(1000)
-        //printf("\n"); // print new line
+        printf("%s: %i \n", "Rotunda:   ", pot_voltage_rotunda);
+        printf("%s: %i \n", "Shoulder:  ", pot_voltage_shoulder);
+        printf("%s: %i \n", "Elbow:     ", pot_voltage_elbow);
+        printf("%s: %i \n", "Wrist:     ", pot_voltage_wrist);
+        delay(1000);
+        printf("\n"); // print new line
     }
     
 }
